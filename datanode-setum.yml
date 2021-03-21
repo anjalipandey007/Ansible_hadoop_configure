@@ -1,0 +1,80 @@
+- hosts: datanode
+  become: true
+  become_method: sudo
+  become_user: root
+  vars_prompt:
+    - name: "datanode_public_IP"
+      prompt: "Enter Datanode Public IP "
+      private: no
+
+    - name: "namenode_public_IP"
+      prompt: "Enter Namenode Public IP "
+      private: no
+
+    - name: "namenode_port"
+      prompt: "Enter namenode port "
+      private: no
+
+    - name: "datanode_folder"
+      prompt: "Enter datanode folder "
+      private: no
+
+  tasks: 
+    - name: "downloading jdk"
+      get_url:
+       url: http://35.244.242.82/yum/java/el7/x86_64/jdk-8u171-linux-x64.rpm
+       dest: /home/ec2-user/jdk-8u171-linux-x64.rpm
+       mode: '0644'
+    
+    - name: "checking the jdk installed or not"
+      shell: "java -version"
+      register: java_result
+      ignore_errors: yes
+    - debug:
+       var: java_result
+
+    - name: "installing jdk"
+      shell: "rpm -i jdk-8u171-linux-x64.rpm"
+      when: java_result.rc==127
+  
+    - name: "downloading hadoop"
+      get_url:
+       url: https://archive.apache.org/dist/hadoop/core/hadoop-1.2.1/hadoop-1.2.1-1.x86_64.rpm
+       dest: /home/ec2-user/hadoop-1.2.1-1.x86_64.rpm
+       mode: '0644'
+
+    - name: "checking the hadoop installed or not"
+      shell: "hadoop -version"
+      ignore_errors: yes
+      register: hadoop_result
+    - debug:
+       var: hadoop_result
+
+    - name: "installing hadoop"
+      shell: "rpm -i hadoop-1.2.1-1.x86_64.rpm --force"
+      when: hadoop_result.rc==127 
+          
+    - name: "making directory for datanode"
+      file:
+       state: directory
+       path: "{{datanode_folder}}"
+
+    - name: "copying hdfs file to datanode"
+      template:
+       dest: "/etc/hadoop/hdfs-site.xml"
+       src: "D_hdfs-site.xml"
+
+    - name: "copying core file to datanode"
+      template:
+       dest: "/etc/hadoop/core-site.xml"
+       src: "D_core-site.xml"
+
+    - name: "starting datanode service"
+      shell: "hadoop-daemon.sh start datanode"
+
+    - name: "see status of service"
+      shell: "jps"
+      register: datanode_out
+    - debug: 
+       var: datanode_out.stdout
+    
